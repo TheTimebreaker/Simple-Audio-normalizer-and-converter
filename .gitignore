@@ -1,3 +1,5 @@
 /.venv
+/build
+/dist
 /normalize_audio.exe
 /test.py
