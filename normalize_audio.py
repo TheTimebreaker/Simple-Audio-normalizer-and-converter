@@ -122,6 +122,17 @@ async def normalize(
             await delete_file(file)
         except FileNotFoundError:
             pass
+async def process_file(input_file:str) -> None:
+    """Main function that runs all the processing functions you want on a file.
+
+    Args:
+        input_file (str): Path to file
+    """
+    await normalize(
+        input_file,
+        float(config['DEFAULTS']['targetdBFS']),
+        config['DEFAULTS']['bitrate']
+    )
 
 async def main(files:list[str]) -> None:
     """Processes all files given.
@@ -135,13 +146,7 @@ async def main(files:list[str]) -> None:
     tasks:list[Coroutine] = []
     for filepath in files:
         if os.path.isfile(filepath):
-            tasks.append(
-                normalize(
-                    filepath,
-                    float(config['DEFAULTS']['targetdBFS']),
-                    config['DEFAULTS']['bitrate']
-                )
-            )
+            tasks.append(process_file(filepath))
         else:
             raise FileNotFoundError(f'{filepath} is not a file.')
 
