@@ -2,8 +2,15 @@ import re, shutil, sys, os, subprocess, asyncio, configparser
 from typing import Optional, Coroutine
 
 
+def getConfigPath():
+    if getattr(sys, 'frozen', False):  # running as a PyInstaller bundle
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, 'config.ini')
+
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(getConfigPath())
 
 semaphore_ffmpeg = asyncio.Semaphore(int(config['limits']['ffmpeg']))
 semaphore_fileOperations = asyncio.Semaphore(int(config['limits']['fileOperations']))
