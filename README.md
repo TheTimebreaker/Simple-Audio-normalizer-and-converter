@@ -9,6 +9,17 @@ This README and this tool are still work in progress.
 * Normalize the maximum peaks to a specific value
 
 
+# Get the tool
+## Compile yourself (recommended)
+1. Download the repository.
+2. Review the config file and adjust it to your needs.
+3. Run `pyinstaller --clean normalize_audio.spec` from the repositories directory.
+This will compile a completely portable executable.
+Since the config file gets compiled into the executable, config changes *after compilation* will be ignored until you compile again and use that new executable.
+
+## Grab latest release
+You can grab the latest release [here https://github.com/TheTimebreaker/Simple-Audio-normalizer-and-converter/releases/latest]. This will use the default config.
+
 # How to Use
 You can drag-and-drop any audio file(s) onto the .bat file.
 Preferably, you will compile the code yourself, which gives you a singular file you can copy/paste whereever you need it and where you can drag-and-drop your files onto aswell.
