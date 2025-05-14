@@ -27,7 +27,7 @@ async def get_max_volume(input_file:str, ffmpeg_subprocess_output:Optional[subpr
             "-f", "null", "-"
         ]
         async with semaphore_ffmpeg:
-            result = await asyncio.to_thread(subprocess.run, cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
+            result = await asyncio.to_thread(subprocess.run, cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True, encoding= 'utf-8')
     else:
         result = ffmpeg_subprocess_output
     match = re.search(r"max_volume:\s*(-?\d+\.?\d*) dB", result.stderr)
@@ -54,7 +54,7 @@ async def normalize(input_file:str, target_dBFS:float, target_bitrate:str = '128
         ]
         async with semaphore_ffmpeg:
             print(f'Un-clipping {input_file} ...')
-            result = await asyncio.to_thread(subprocess.run, cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
+            result = await asyncio.to_thread(subprocess.run, cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True, encoding= 'utf-8')
         max_volume = await get_max_volume(clip_file, result) - clip_test_dB
 
     async with semaphore_ffmpeg:
