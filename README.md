@@ -18,7 +18,7 @@ This will compile a completely portable executable.
 Since the config file gets compiled into the executable, config changes *after compilation* will be ignored until you compile again and use that new executable.
 
 ## Grab latest release
-You can grab the latest release [here https://github.com/TheTimebreaker/Simple-Audio-normalizer-and-converter/releases/latest]. This will use the default config.
+You can grab the latest release [here](https://github.com/TheTimebreaker/Simple-Audio-normalizer-and-converter/releases/latest). This will use the default config.
 
 # How to Use
 You can drag-and-drop any audio file(s) onto the .bat file.
