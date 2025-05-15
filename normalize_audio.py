@@ -100,45 +100,43 @@ async def get_duration_seconds(input_file:str) -> float:
 async def normalize(
         input_file:str,
         target_dBFS:float, #pylint:disable=invalid-name
+        target_bitrate:str
     ) -> str:
     """Normalize the volume of the audio file recursively to avoid clipping.
     Returns:
         str: Path to output file
     """
     # base, _ = os.path.splitext(input_file)
-    clip_file = input_file + ".cliptmp.wav"
+    clip_file = input_file + ".cliptmp.mp3"
     output_file = input_file + '.normalized.wav'
 
-    max_volume = await get_max_volume(input_file)
-    is_clipped = round(max_volume, 1) == 0.0
-    if is_clipped:
-        clip_test_dB = -6 #pylint:disable=invalid-name
-        cmd = [
-            "ffmpeg", "-y", "-i", input_file,
-            "-af", f"volume={clip_test_dB}dB,volumedetect",
-            # "-c:a", "libmp3lame", "-b:a", '128k',
-            clip_file
-        ]
-        async with semaphore_ffmpeg:
-            print(f'Un-clipping {input_file} ...')
-            result = await asyncio.to_thread(
-                subprocess.run,
-                cmd,
-                stderr=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                text=True,
-                encoding= 'utf-8'
-            )
-        max_volume = await get_max_volume(clip_file, result) - clip_test_dB
+
+    clip_test_dB = -6 #pylint:disable=invalid-name
+    cmd = [
+        "ffmpeg", "-y", "-i", input_file,
+        '-loglevel', 'error',
+        "-af", f"volume={clip_test_dB}dB",
+        "-c:a", "libmp3lame", "-b:a", target_bitrate,
+        clip_file
+    ]
+    async with semaphore_ffmpeg:
+        print(f'Un-clipping {input_file} ...')
+        await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+        )
+    max_volume = await get_max_volume(clip_file) - clip_test_dB
+
 
     async with semaphore_ffmpeg:
         print(f'Normalizing {input_file} ...')
         await asyncio.to_thread(subprocess.run, [
             "ffmpeg", "-y", "-i", input_file,
             '-loglevel', 'error',
-            "-af", f"volume={target_dBFS - max_volume}dB,volumedetect",
+            "-af", f"volume={target_dBFS - max_volume}dB",
             output_file
         ])
+
 
     for file in (clip_file, ):
         try:
@@ -214,7 +212,8 @@ async def process_file(input_file:str) -> None:
 
     input_file = await normalize(
         input_file,
-        float(config['DEFAULTS']['targetdBFS'])
+        float(config['DEFAULTS']['targetdBFS']),
+        config['DEFAULTS']['bitrate']
     )
     cleanup_files.append(input_file)
 
