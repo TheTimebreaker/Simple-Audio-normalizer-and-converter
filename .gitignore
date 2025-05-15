@@ -3,3 +3,8 @@
 /dist
 /normalize_audio.exe
 /test.py
+/config.ini
+/*.mp3
+/*.wav
+/*.aac
+/*.opus
