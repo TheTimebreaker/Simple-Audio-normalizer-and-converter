@@ -97,18 +97,15 @@ async def get_duration_seconds(input_file:str) -> float:
         )
     return float(result.stdout.strip())
 
-async def normalize(
-        input_file:str,
-        target_dBFS:float, #pylint:disable=invalid-name
-        target_bitrate:str
-    ) -> str:
+async def normalize(input_file:str) -> str:
     """Normalize the volume of the audio file recursively to avoid clipping.
     Returns:
         str: Path to output file
     """
-    # base, _ = os.path.splitext(input_file)
-    clip_file = input_file + ".cliptmp.mp3"
+    clip_file = input_file + ".clipping-tmp.mp3"
     output_file = input_file + '.normalized.wav'
+    target_dBFS = float(config['DEFAULTS']['targetdBFS']) #pylint:disable=invalid-name
+    target_bitrate = config['DEFAULTS']['bitrate']
 
 
     clip_test_dB = -6 #pylint:disable=invalid-name
@@ -149,8 +146,8 @@ async def remove_silence(input_file:str) -> str:
     Returns:
         str: Path to output file
     """
-    silenceremove_file = input_file + ".silenceremove.wav"
-    output_file = input_file + '.remove_silence.wav'
+    silenceremove_file = input_file + ".silenceremoved-tmp.wav"
+    output_file = input_file + '.silenceremoved.wav'
 
     # variable names according to https://ffmpeg.org/ffmpeg-filters.html#silenceremove
     # these are named for the removal of silence at the beginning, but are used for the end as well
@@ -194,6 +191,21 @@ async def remove_silence(input_file:str) -> str:
             pass
     return output_file
 
+async def final_conversion(input_file:str, output_file:str) -> None:
+    """Final conversion function for audio files.
+
+    Args:
+        input_file (str): Path for input file.
+        output_file (str): Path for output file.
+    """
+    async with semaphore_ffmpeg:
+        await asyncio.to_thread(subprocess.run, [
+            "ffmpeg", "-y", "-i", input_file,
+            '-loglevel', 'error',
+            "-c:a", "libmp3lame", "-b:a", config['DEFAULTS']['bitrate'],
+            output_file
+        ])
+
 async def process_file(input_file:str) -> None:
     """Main function that runs all the processing functions you want on a file.
 
@@ -205,25 +217,24 @@ async def process_file(input_file:str) -> None:
     final_output_tmp = final_output + '.tmp.mp3'
     cleanup_files:list[str] = [input_file]
 
+
     input_file = await remove_silence(
         input_file
     )
     cleanup_files.append(input_file)
 
+
     input_file = await normalize(
-        input_file,
-        float(config['DEFAULTS']['targetdBFS']),
-        config['DEFAULTS']['bitrate']
+        input_file
     )
     cleanup_files.append(input_file)
 
 
-    await asyncio.to_thread(subprocess.run, [
-        "ffmpeg", "-y", "-i", input_file,
-        '-loglevel', 'error',
-        "-c:a", "libmp3lame", "-b:a", config['DEFAULTS']['bitrate'],
-        final_output_tmp
-    ])
+    await final_conversion(
+        input_file, final_output_tmp
+    )
+
+
     for file in cleanup_files:
         try:
             await delete_file(file)
