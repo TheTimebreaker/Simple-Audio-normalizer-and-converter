@@ -109,7 +109,7 @@ async def normalize(input_file:str) -> str:
     clip_file = input_file + ".clipping-tmp.mp3"
     output_file = input_file + '.normalized.wav'
     target_dBFS = float(config['normalize']['targetdBFS']) #pylint:disable=invalid-name
-    target_bitrate = config['normalize']['bitrate']
+    target_bitrate = config['GENERAL']['bitrate']
 
 
     clip_test_dB = -6 #pylint:disable=invalid-name
@@ -207,7 +207,7 @@ async def final_conversion(input_file:str, output_file:str) -> None:
         await asyncio.to_thread(subprocess.run, [
             "ffmpeg", "-y", "-i", input_file,
             '-loglevel', 'error',
-            "-c:a", "libmp3lame", "-b:a", config['normalize']['bitrate'],
+            "-c:a", "libmp3lame", "-b:a", config['GENERAL']['bitrate'],
             output_file
         ])
 

@@ -25,6 +25,17 @@ You can grab the latest release [here](https://github.com/TheTimebreaker/Simple-
 You can drag-and-drop any audio file(s) onto the .bat file.
 Preferably, you will compile the code yourself, which gives you a singular file you can copy/paste whereever you need it and where you can drag-and-drop your files onto aswell.
 
+# Config documentation
+* `GENERAL`: General settings.
+    * `bitrate`: Target bitrate for final output.
+* `normalize`
+    * `targetdBFS`: Target peak amplitude for normalization (in dB / dBFS)
+* `remove-silence`
+    * `silence_threshold_dB`: dB amplitude, below which something is considered *silence*.
+    * `keep_silence_seconds`: Maximum length of silence that will be kept (i.e. all silence will be cut out, except for the `keep_silence_seconds` duration next to the actual audio)
+* `limits`: Limiters.
+    * `ffmpeg`: Maximum amount of ffmpeg processes that are allowed to run in parallel.
+    * `fileOperations`: Maximum amount of file operations (moving, deleteing, ...) that are allowed to run in parallel.
 
 # Working on...
 * Multiple output formats
