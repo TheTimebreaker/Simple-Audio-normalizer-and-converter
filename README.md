@@ -5,8 +5,9 @@ This README and this tool are still work in progress.
 
 
 # Features
-* Convert all audio files to MP3
-* Normalize the maximum peaks to a specific value
+* Convert all audio files to MP3.
+* Normalize the maximum peaks to a specific value.
+* Remove silence at the beginning and end of audio file.
 
 
 # Get the tool
@@ -27,7 +28,6 @@ Preferably, you will compile the code yourself, which gives you a singular file 
 
 # Working on...
 * Multiple output formats
-* Remove silence at the start and end of the file.
 * Cross-platform compilation, pyinstaller presets, and venv setup.
 
 
