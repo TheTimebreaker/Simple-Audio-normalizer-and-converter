@@ -14,7 +14,11 @@ def get_config_path() -> str:
         base_path = sys._MEIPASS #type:ignore #pylint:disable=protected-access
     else:
         base_path = os.path.dirname(__file__)
-    return os.path.join(base_path, 'config.ini')
+    config_path = os.path.join(base_path, 'config.ini')
+    if os.path.isfile(config_path):
+        return config_path
+    return os.path.join(base_path, 'config_default.ini')
+
 
 config = configparser.ConfigParser()
 config.read(get_config_path())
@@ -104,8 +108,8 @@ async def normalize(input_file:str) -> str:
     """
     clip_file = input_file + ".clipping-tmp.mp3"
     output_file = input_file + '.normalized.wav'
-    target_dBFS = float(config['DEFAULTS']['targetdBFS']) #pylint:disable=invalid-name
-    target_bitrate = config['DEFAULTS']['bitrate']
+    target_dBFS = float(config['normalize']['targetdBFS']) #pylint:disable=invalid-name
+    target_bitrate = config['normalize']['bitrate']
 
 
     clip_test_dB = -6 #pylint:disable=invalid-name
@@ -152,8 +156,8 @@ async def remove_silence(input_file:str) -> str:
     # variable names according to https://ffmpeg.org/ffmpeg-filters.html#silenceremove
     # these are named for the removal of silence at the beginning, but are used for the end as well
     start_duration = 0
-    start_threshold_dB = -30 #pylint:disable=invalid-name
-    start_silence = 0.2
+    start_threshold_dB = int(config['remove-silence']['silence_threshold_dB'])#pylint:disable=invalid-name
+    start_silence = float(config['remove-silence']['keep_silence_seconds'])
 
     silenceremove_parameters = f'1:{start_duration}:{start_threshold_dB}dB:{start_silence}'
     async with semaphore_ffmpeg:
@@ -161,7 +165,9 @@ async def remove_silence(input_file:str) -> str:
         await asyncio.to_thread(subprocess.run, [
             "ffmpeg", "-y", "-i", input_file,
             '-loglevel', 'error',
-            "-af", (
+            "-af", (    # silence remover is strange and can sometimes remove song parts if used
+                        # at the end using the proper end parameters. using areverse (turns audio
+                        # backwards), this is a non-isse, since the start remover works fine
                         f'silenceremove={silenceremove_parameters},'
                         'areverse,'
                         f'silenceremove={silenceremove_parameters},'
@@ -169,7 +175,6 @@ async def remove_silence(input_file:str) -> str:
                     ),
             silenceremove_file
         ])
-
 
     duration_seconds:float = await get_duration_seconds(silenceremove_file)
     async with semaphore_ffmpeg:
@@ -202,7 +207,7 @@ async def final_conversion(input_file:str, output_file:str) -> None:
         await asyncio.to_thread(subprocess.run, [
             "ffmpeg", "-y", "-i", input_file,
             '-loglevel', 'error',
-            "-c:a", "libmp3lame", "-b:a", config['DEFAULTS']['bitrate'],
+            "-c:a", "libmp3lame", "-b:a", config['normalize']['bitrate'],
             output_file
         ])
 
