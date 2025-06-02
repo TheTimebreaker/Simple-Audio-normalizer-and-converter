@@ -168,8 +168,10 @@ async def remove_silence(input_file:str) -> str:
             "-af", (    # silence remover is strange and can sometimes remove song parts if used
                         # at the end using the proper end parameters. using areverse (turns audio
                         # backwards), this is a non-isse, since the start remover works fine
+                        f'adelay={int(start_silence)+1}s:all=true,'
                         f'silenceremove={silenceremove_parameters},'
                         'areverse,'
+                        f'adelay={int(start_silence)+1}s:all=true,'
                         f'silenceremove={silenceremove_parameters},'
                         'areverse'
                     ),
