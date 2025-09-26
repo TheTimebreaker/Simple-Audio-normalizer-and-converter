@@ -6,6 +6,7 @@ import subprocess
 import asyncio
 import configparser
 from typing import Optional, Coroutine
+import traceback
 
 
 def get_config_path() -> str:
@@ -18,6 +19,15 @@ def get_config_path() -> str:
     if os.path.isfile(config_path):
         return config_path
     return os.path.join(base_path, "config_default.ini")
+
+
+async def delete_cleanup_files(files: list[str]) -> None:
+    """Removes a list of files."""
+    for file in files:
+        try:
+            await delete_file(file)
+        except FileNotFoundError:
+            pass
 
 
 config = configparser.ConfigParser()
@@ -103,134 +113,131 @@ async def normalize(input_file: str) -> str:
     Returns:
         str: Path to output file
     """
-    clip_file = input_file + ".clipping-tmp.mp3"
-    output_file = input_file + ".normalized.wav"
-    target_dBFS = float(
-        config["normalize"]["targetdBFS"]
-    )  # pylint:disable=invalid-name
-    target_bitrate = config["GENERAL"]["bitrate"]
+    try:
+        clip_file = input_file + ".clipping-tmp.mp3"
+        output_file = input_file + ".normalized.wav"
+        target_dBFS = float(
+            config["normalize"]["targetdBFS"]
+        )  # pylint:disable=invalid-name
+        target_bitrate = config["GENERAL"]["bitrate"]
 
-    clip_test_dB = -6  # pylint:disable=invalid-name
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        input_file,
-        "-loglevel",
-        "error",
-        "-af",
-        f"volume={clip_test_dB}dB",
-        "-c:a",
-        "libmp3lame",
-        "-b:a",
-        target_bitrate,
-        clip_file,
-    ]
-    async with semaphore_ffmpeg:
-        print(f"Un-clipping {input_file} ...")
-        await asyncio.to_thread(
-            subprocess.run,
-            cmd,
-        )
-    max_volume = await get_max_volume(clip_file) - clip_test_dB
+        clip_test_dB = -6  # pylint:disable=invalid-name
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_file,
+            "-loglevel",
+            "error",
+            "-af",
+            f"volume={clip_test_dB}dB",
+            "-c:a",
+            "libmp3lame",
+            "-b:a",
+            target_bitrate,
+            clip_file,
+        ]
+        async with semaphore_ffmpeg:
+            print(f"Un-clipping {input_file} ...")
+            await asyncio.to_thread(
+                subprocess.run,
+                cmd,
+            )
+        max_volume = await get_max_volume(clip_file) - clip_test_dB
 
-    async with semaphore_ffmpeg:
-        print(f"Normalizing {input_file} ...")
-        await asyncio.to_thread(
-            subprocess.run,
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                input_file,
-                "-loglevel",
-                "error",
-                "-af",
-                f"volume={target_dBFS - max_volume}dB",
-                output_file,
-            ],
-        )
+        async with semaphore_ffmpeg:
+            print(f"Normalizing {input_file} ...")
+            await asyncio.to_thread(
+                subprocess.run,
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    input_file,
+                    "-loglevel",
+                    "error",
+                    "-af",
+                    f"volume={target_dBFS - max_volume}dB",
+                    output_file,
+                ],
+            )
 
-    for file in (clip_file,):
-        try:
-            await delete_file(file)
-        except FileNotFoundError:
-            pass
-    return output_file
+        return output_file
+    finally:
+        await delete_cleanup_files([clip_file])
 
 
 async def remove_silence(input_file: str) -> str:
     """Normalize the volume of the audio file recursively to avoid clipping.
     Returns:
         str: Path to output file
+
     """
-    silenceremove_file = input_file + ".silenceremoved-tmp.wav"
-    output_file = input_file + ".silenceremoved.wav"
+    try:
+        silenceremove_file = input_file + ".silenceremoved-tmp.wav"
+        output_file = input_file + ".silenceremoved.wav"
 
-    # variable names according to https://ffmpeg.org/ffmpeg-filters.html#silenceremove
-    # these are named for the removal of silence at the beginning, but are used for the end as well
-    start_duration = 0
-    start_threshold_dB = int(
-        config["remove-silence"]["silence_threshold_dB"]
-    )  # pylint:disable=invalid-name
-    start_silence = float(config["remove-silence"]["keep_silence_seconds"])
+        # variable names according to https://ffmpeg.org/ffmpeg-filters.html#silenceremove
+        # these are named for the removal of silence at the beginning, but are used for the end as well
+        start_duration = 0
+        start_threshold_dB = int(
+            config["remove-silence"]["silence_threshold_dB"]
+        )  # pylint:disable=invalid-name
+        start_silence = float(config["remove-silence"]["keep_silence_seconds"])
 
-    silenceremove_parameters = (
-        f"1:{start_duration}:{start_threshold_dB}dB:{start_silence}"
-    )
-    async with semaphore_ffmpeg:
-        print(f"Removing silence {input_file} ...")
-        await asyncio.to_thread(
-            subprocess.run,
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                input_file,
-                "-loglevel",
-                "error",
-                "-af",
-                (  # silence remover is strange and can sometimes remove song parts if used
-                    # at the end using the proper end parameters. using areverse (turns audio
-                    # backwards), this is a non-isse, since the start remover works fine
-                    f"adelay={int(start_silence)+1}s:all=true,"
-                    f"silenceremove={silenceremove_parameters},"
-                    "areverse,"
-                    f"adelay={int(start_silence)+1}s:all=true,"
-                    f"silenceremove={silenceremove_parameters},"
-                    "areverse"
-                ),
-                silenceremove_file,
-            ],
+        silenceremove_parameters = (
+            f"1:{start_duration}:{start_threshold_dB}dB:{start_silence}"
         )
+        async with semaphore_ffmpeg:
+            print(f"Removing silence {input_file} ...")
+            await asyncio.to_thread(
+                subprocess.run,
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    input_file,
+                    "-loglevel",
+                    "error",
+                    "-af",
+                    (  # silence remover is strange and can sometimes remove song parts if used
+                        # at the end using the proper end parameters. using areverse (turns audio
+                        # backwards), this is a non-isse, since the start remover works fine
+                        f"adelay={int(start_silence)+1}s:all=true,"
+                        f"silenceremove={silenceremove_parameters},"
+                        "areverse,"
+                        f"adelay={int(start_silence)+1}s:all=true,"
+                        f"silenceremove={silenceremove_parameters},"
+                        "areverse"
+                    ),
+                    silenceremove_file,
+                ],
+            )
 
-    duration_seconds: float = await get_duration_seconds(silenceremove_file)
-    async with semaphore_ffmpeg:
-        print(f"Applying fades {input_file} ...")
-        await asyncio.to_thread(
-            subprocess.run,
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                silenceremove_file,
-                "-loglevel",
-                "error",
-                "-af",
-                (
-                    f"afade=t=in:ss=0:d={start_silence},"
-                    f"afade=t=out:st={duration_seconds - start_silence}:d={start_silence}"
-                ),
-                output_file,
-            ],
-        )
+        duration_seconds: float = await get_duration_seconds(silenceremove_file)
+        async with semaphore_ffmpeg:
+            print(f"Applying fades {input_file} ...")
+            await asyncio.to_thread(
+                subprocess.run,
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    silenceremove_file,
+                    "-loglevel",
+                    "error",
+                    "-af",
+                    (
+                        f"afade=t=in:ss=0:d={start_silence},"
+                        f"afade=t=out:st={duration_seconds - start_silence}:d={start_silence}"
+                    ),
+                    output_file,
+                ],
+            )
 
-    for file in (silenceremove_file,):
-        try:
-            await delete_file(file)
-        except FileNotFoundError:
-            pass
-    return output_file
+        return output_file
+    finally:
+        await delete_cleanup_files([silenceremove_file])
 
 
 async def final_conversion(input_file: str, output_file: str) -> None:
@@ -269,7 +276,8 @@ async def process_file(input_file: str) -> None:
         base, _ = os.path.splitext(input_file)
         final_output = base + ".mp3"
         final_output_tmp = final_output + ".tmp.mp3"
-        cleanup_files: list[str] = [input_file]
+        cleanup_files: list[str] = []
+        original_file = input_file
 
         input_file = await remove_silence(input_file)
         cleanup_files.append(input_file)
@@ -278,15 +286,13 @@ async def process_file(input_file: str) -> None:
         cleanup_files.append(input_file)
 
         await final_conversion(input_file, final_output_tmp)
+        # You must add the original file here, because otherwise the cleanup function may delete it when some part of this try block fails
+        cleanup_files.append(original_file)
     except ValueError as error:
         raise ValueError(f"{input_file} - {error}") from error
     finally:
-        for file in cleanup_files:
-            try:
-                await delete_file(file)
-            except FileNotFoundError:
-                pass
-        await move_file(final_output_tmp, final_output)
+        await delete_cleanup_files(cleanup_files)
+    await move_file(final_output_tmp, final_output)
 
 
 async def main(files: list[str]) -> None:
