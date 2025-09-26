@@ -306,7 +306,7 @@ async def main(files: list[str]) -> None:
             raise FileNotFoundError(f"{filepath} is not a file.")
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    for i, result in enumerate(results):
+    for result in results:
         if isinstance(result, Exception):
             print(f"[ERROR] - {result}")
 
